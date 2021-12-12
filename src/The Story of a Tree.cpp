@@ -33,12 +33,7 @@ pair<int, int> reduceFraction(int x, int y){
 }
 
 string storyOfATree(int n, vector<vector<int>> edges, int k, vector<vector<int>> guesses) {
-	cout << "start" << endl;
     vector<vector<int>> adjacencyList(n, vector<int>());
-    for (int idx = 0; idx < n - 1; ++idx) {
-    	adjacencyList[idx].reserve(n);
-    }
-
     for (int idx = 0; idx < n - 1; ++idx) {
         int fromIdx = edges[idx][0] - 1;
         int toIdx = edges[idx][1] - 1;
@@ -48,49 +43,66 @@ string storyOfATree(int n, vector<vector<int>> edges, int k, vector<vector<int>>
 
     vector<int> parents(n, -1);
     list<int> dfsStack;
+
     parents[0] = 0;
     dfsStack.push_back(0);
 
     while(!dfsStack.empty()) {
         int currentIdx = dfsStack.back();
         dfsStack.pop_back();
-
-        for(int idx = 0; idx < adjacencyList[currentIdx].size(); ++idx) {
-        	int nIdx = adjacencyList[currentIdx][idx];
-            if (parents[nIdx] < 0) {
-                parents[nIdx] = currentIdx;
-                dfsStack.push_back(nIdx);
+        for(int neighbourIdx = 0; neighbourIdx < adjacencyList[currentIdx].size(); ++neighbourIdx) {
+        	int toIdx = adjacencyList[currentIdx][neighbourIdx];
+            if (parents[toIdx] < 0) {
+                parents[toIdx] = currentIdx;
+                dfsStack.push_back(toIdx);
             }
         }
     }
     parents[0] = -1;
 
+    vector<int> guessesPartial(n, 0);
+    for (int guessIdx = 0; guessIdx < guesses.size(); ++guessIdx) {
+    	int childGuess = guesses[guessIdx][1] - 1;
+    	int parentGuess = guesses[guessIdx][0] - 1;
+
+        if (parents[childGuess] == parentGuess) {
+        	guessesPartial[0]++;			// increase win for all nodes from root
+        	guessesPartial[childGuess]--;  // decrease win for all nodes from child to adjust for win from root
+        }
+        else if (parents[parentGuess] == childGuess){
+        	guessesPartial[parentGuess]++;  // increase wins for children only
+        }
+        else{
+        	// this means that nodes are not connected, so guess is always wrong
+        }
+    };
+
+    // do dfs to collect final good gueses count
+    vector<int> guessesFinal(n, 0);
+    list<pair<int, int>> winsStack;
+    winsStack.push_back(make_pair(0, guessesPartial[0]));
+    while(!winsStack.empty()) {
+    	pair<int, int> current = winsStack.back();
+    	winsStack.pop_back();
+
+    	guessesFinal[current.first] = current.second;
+
+        for(int neighbourIdx = 0; neighbourIdx < adjacencyList[current.first].size(); ++neighbourIdx) {
+        	int toIdx = adjacencyList[current.first][neighbourIdx];
+        	if (parents[current.first] == toIdx) continue;
+        	winsStack.push_back(make_pair(toIdx, current.second + guessesPartial[toIdx]));
+        }
+    }
+    parents.clear();
+    adjacencyList.clear();
+    guessesPartial.clear();
+
+    // count wins
     int wins = 0;
     for (int rootIdx = 0; rootIdx < n; ++rootIdx) {
-        int correctGuesses = 0;
-        for (int guessIdx = 0; guessIdx < guesses.size(); ++guessIdx) {
-            if (parents[guesses[guessIdx][1] - 1] == guesses[guessIdx][0] - 1)
-                correctGuesses++;
-        };
-        if (correctGuesses >= k) ++wins;
-
-        if (rootIdx == n - 1) break;
-
-        int currentIdx = rootIdx + 1;
-        int nextIdx = parents[currentIdx];
-        int nextParent = parents[nextIdx];
-
-        parents[currentIdx] = -1;
-
-        while (nextIdx != rootIdx) {
-            parents[nextIdx] = currentIdx;
-            currentIdx = nextIdx;
-            nextIdx = nextParent;
-            nextParent = parents[nextIdx];
-        }
-        parents[rootIdx] = currentIdx;
+    	//cout << "rootIdx " << rootIdx << " " << guessesFinal[rootIdx] << " / " << k << endl;
+        if (guessesFinal[rootIdx] >= k) ++wins;
     }
-
 
     if (wins == 0){
         return "0/1";
